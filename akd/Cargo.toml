@@ -72,3 +72,8 @@ akd = { path = ".", features = ["public-tests"], default-features = false }
 name = "azks"
 harness = false
 required-features = ["bench"]
+
+[[bench]]
+name = "audit"
+harness = false
+required-features = ["bench"]
