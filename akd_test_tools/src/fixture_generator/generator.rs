@@ -27,6 +27,8 @@ use crate::fixture_generator::parser::Args;
 use crate::fixture_generator::writer::yaml::YamlWriter;
 use crate::fixture_generator::writer::Writer;
 
+use protobuf::Message;
+
 /// Directory state comprises all database records at a particular epoch.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -162,8 +164,24 @@ pub(crate) async fn generate(args: Args) {
             }
         }
 
+        let label = AkdLabel::random(&mut rng);
+        let value = AkdValue::random(&mut rng);
+        updates.push((label.clone(), value));
+
         // perform publish
         akd.publish(updates.clone()).await.unwrap();
+
+        let (proof, hash) = akd.lookup(label).await.unwrap();
+
+        let variants = akd::utils::lookup_proof_variants(&proof);
+
+        let pb_proof = akd::proto::specs::types::LookupProof::from(&proof);
+        writer.write_object(hex::encode(pb_proof.write_to_bytes().unwrap()));
+        writer.write_comment(&format!(
+            "{} {}",
+            "length",
+            pb_proof.write_to_bytes().unwrap().len()
+        ));
 
         // write state if required
         if let Some(ref states) = args.capture_states {

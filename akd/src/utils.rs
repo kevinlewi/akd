@@ -5,9 +5,7 @@
 // License, Version 2.0 found in the LICENSE-APACHE file in the root directory
 // of this source tree.
 
-// 1. Create a hashmap of all prefixes of all elements of the node set
-// 2. For each node in current_nodes set, check if each child is in prefix hashmap
-// 3. If so, add child label to batch set
+use crate::LookupProof;
 
 // Creates a byte array of 32 bytes from a u64
 // Note that this representation is big-endian, and
@@ -27,4 +25,35 @@ pub(crate) fn random_label(rng: &mut impl rand::Rng) -> crate::NodeLabel {
         label_val: rng.gen::<[u8; 32]>(),
         label_len: 256,
     }
+}
+
+pub fn lookup_proof_variants(original_proof: &LookupProof) -> Vec<(LookupProof, bool)> {
+    let mut variants = vec![];
+
+    variants.push((original_proof.clone(), true));
+
+    let mut modified_epoch = original_proof.clone();
+    modified_epoch.epoch += 1;
+    variants.push((modified_epoch, false));
+
+    let mut modified_version = original_proof.clone();
+    modified_version.version += 1;
+    variants.push((modified_version, false));
+
+    let mut modified_value = original_proof.clone();
+    modified_value.value.0[0] += 1;
+    variants.push((modified_value, false));
+
+    let mut modified_commitment_nonce = original_proof.clone();
+    modified_commitment_nonce.commitment_nonce[0] += 1;
+    variants.push((modified_commitment_nonce, false));
+
+    let mut modified_membership_proof_label = original_proof.clone();
+    modified_membership_proof_label
+        .existence_proof
+        .label
+        .label_val[0] += 1;
+    variants.push((modified_membership_proof_label, false));
+
+    variants
 }

@@ -500,15 +500,20 @@ async fn test_complex_verification_many_versions() -> Result<(), AkdError> {
 
             let (lookup_proof, epoch_hash_from_lookup) = akd.lookup(label.clone()).await?;
             assert_eq!(epoch_hash, epoch_hash_from_lookup);
-            let lookup_verify_result = lookup_verify(
-                vrf_pk.as_bytes(),
-                epoch_hash.hash(),
-                label.clone(),
-                lookup_proof,
-            )?;
-            assert_eq!(lookup_verify_result.epoch, latest_added_epoch);
-            assert_eq!(lookup_verify_result.value, lookup_value);
-            assert_eq!(lookup_verify_result.version, epoch / index);
+            for (proof, expected_result_bool) in crate::utils::lookup_proof_variants(&lookup_proof)
+            {
+                let result =
+                    lookup_verify(vrf_pk.as_bytes(), epoch_hash.hash(), label.clone(), proof);
+                match result {
+                    Err(_) => assert!(expected_result_bool == false),
+                    Ok(result) => {
+                        assert!(expected_result_bool == true);
+                        assert_eq!(result.epoch, latest_added_epoch);
+                        assert_eq!(result.value, lookup_value);
+                        assert_eq!(result.version, epoch / index);
+                    }
+                };
+            }
 
             let (history_proof, epoch_hash_from_history) =
                 akd.key_history(&label, HistoryParams::Complete).await?;

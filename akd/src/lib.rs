@@ -416,6 +416,7 @@ pub mod errors;
 pub mod helper_structs;
 pub mod storage;
 pub mod tree_node;
+pub mod utils;
 
 #[cfg(feature = "protobuf")]
 pub mod local_auditing;
@@ -424,8 +425,6 @@ pub use akd_core::hash::Digest;
 pub use akd_core::hash::DIGEST_BYTES;
 pub use akd_core::verify;
 pub use akd_core::*;
-
-mod utils;
 
 // ========== Type re-exports which are commonly used ========== //
 pub use append_only_zks::Azks;

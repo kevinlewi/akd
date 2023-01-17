@@ -21,6 +21,8 @@ serde_yaml = "0.8"
 serde = "1.0"
 async-trait = "0.1"
 thread-id = "3"
+protobuf = "3.2"
+hex = "0.4"
 
 akd = { path = "../akd", features = ["serde_serialization"], version = "0.8.7" }
 
