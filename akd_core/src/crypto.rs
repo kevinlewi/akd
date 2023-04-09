@@ -7,7 +7,7 @@
 
 //! Functions for performing the core cryptographic operations for AKD
 
-use crate::hash::{hash, Digest, DIGEST_BYTES};
+use crate::hash::{hash, Digest};
 use crate::utils::i2osp_array;
 use crate::{
     AkdLabel, AkdValue, AzksValue, AzksValueWithEpoch, NodeLabel, VersionFreshness, EMPTY_LABEL,
@@ -16,6 +16,8 @@ use crate::{
 
 #[cfg(feature = "nostd")]
 use alloc::vec::Vec;
+use dusk_bytes::Serializable;
+use dusk_plonk::prelude::BlsScalar;
 
 /// The value stored in the root node upon initialization, with no children
 pub fn empty_root_value() -> AzksValue {
@@ -52,12 +54,37 @@ pub(crate) fn hash_leaf_with_value(
     hash_leaf_with_commitment(commitment, epoch)
 }
 
+fn bytes_to_u64_array(bytes: &[u8]) -> [u64; 4] {
+    let mut arr = [0u64; 4];
+    for i in 0..4 {
+        let mut temp = [0u8; 8];
+        temp.copy_from_slice(&bytes[i * 8..(i + 1) * 8]);
+        arr[i] = u64::from_le_bytes(temp);
+    }
+    arr
+}
+
 /// Hash a commit and epoch together to get the leaf's hash value
 pub fn hash_leaf_with_commitment(commitment: AzksValue, epoch: u64) -> AzksValueWithEpoch {
-    let mut data = [0; DIGEST_BYTES + 8];
-    data[..DIGEST_BYTES].copy_from_slice(&commitment.0);
-    data[DIGEST_BYTES..].copy_from_slice(&epoch.to_be_bytes());
-    AzksValueWithEpoch(hash(&data))
+    let arr1 = bytes_to_u64_array(&commitment.0);
+
+    use dusk_bytes::Serializable;
+    use dusk_plonk::prelude::*;
+
+    let scalar1 = BlsScalar::from_raw(arr1);
+    let scalar2 = BlsScalar::from(epoch);
+
+    let output = dusk_poseidon::sponge::hash(&[scalar1, scalar2]);
+    let output_bytes = output.to_bytes();
+
+    println!(
+        "(Epoch hashing) output: {:?}, scalar1: {:?}, scalar2: {:?}",
+        hex::encode(output.to_bytes()),
+        hex::encode(scalar1.to_bytes()),
+        hex::encode(scalar2.to_bytes()),
+    );
+
+    AzksValueWithEpoch(output_bytes)
 }
 
 /// Used by the server to produce a commitment nonce for an AkdLabel, version, and AkdValue.
@@ -129,6 +156,7 @@ pub fn compute_parent_hash_from_children(
     //        right_label,
     //    ].concat()
     // )
+    /*
     AzksValue(hash(
         &[
             hash(&[left_val.0.to_vec(), left_label.to_vec()].concat()),
@@ -136,6 +164,35 @@ pub fn compute_parent_hash_from_children(
         ]
         .concat(),
     ))
+    */
+
+    use dusk_bytes::Serializable;
+    use dusk_plonk::prelude::*;
+
+    let arr1 = bytes_to_u64_array(&left_val.0);
+    let arr2 = bytes_to_u64_array(&left_label);
+    let arr3 = bytes_to_u64_array(&right_val.0);
+    let arr4 = bytes_to_u64_array(&right_label);
+
+    let scalar1 = BlsScalar::from_raw(arr1);
+    let scalar2 = BlsScalar::from_raw(arr2);
+    let scalar3 = BlsScalar::from_raw(arr3);
+    let scalar4 = BlsScalar::from_raw(arr4);
+
+    let output = dusk_poseidon::sponge::hash(&[scalar1, scalar2, scalar3, scalar4]);
+
+    println!(
+        "output: {:?}, scalar1: {:?}, scalar2: {:?}, scalar3: {:?}, scalar4: {:?}",
+        hex::encode(output.to_bytes()),
+        hex::encode(scalar1.to_bytes()),
+        hex::encode(scalar2.to_bytes()),
+        hex::encode(scalar3.to_bytes()),
+        hex::encode(scalar4.to_bytes()),
+    );
+
+    let output_bytes = output.to_bytes();
+
+    AzksValue(output_bytes)
 }
 
 /// Given the top-level hash, compute the "actual" root hash that is published
@@ -143,7 +200,7 @@ pub fn compute_parent_hash_from_children(
 pub fn compute_root_hash_from_val(root_val: &AzksValue) -> Digest {
     // FIXME(#344) Change this to:
     // root_val
-    hash(&[&root_val.0[..], &NodeLabel::root().hash()].concat())
+    root_val.0
 }
 
 /// Used by the server to produce a commitment for an AkdLabel, version, and AkdValue
@@ -163,7 +220,11 @@ pub fn compute_fresh_azks_value(
     value: &AkdValue,
 ) -> AzksValue {
     let nonce = get_commitment_nonce(commitment_key, label, version, value);
-    AzksValue(hash(&[i2osp_array(value), i2osp_array(&nonce)].concat()))
+    let value = hash(&[i2osp_array(value), i2osp_array(&nonce)].concat());
+
+    let arr1 = bytes_to_u64_array(&value);
+
+    AzksValue(BlsScalar::from_raw(arr1).to_bytes())
 }
 
 /// Similar to commit_fresh_value, but used for stale values.

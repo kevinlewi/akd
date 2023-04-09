@@ -12,8 +12,10 @@ use crate::ecvrf::{VRFKeyStorage, VRFPublicKey};
 use crate::errors::{AkdError, DirectoryError, StorageError};
 use crate::helper_structs::LookupInfo;
 use crate::storage::manager::StorageManager;
+use crate::storage::memory::AsyncInMemoryDatabase;
 use crate::storage::types::{DbRecord, ValueState, ValueStateRetrievalFlag};
 use crate::storage::Database;
+use crate::tree_node::NodeHashingMode;
 use crate::{
     AkdLabel, AkdValue, AppendOnlyProof, AzksElement, Digest, EpochHash, HistoryProof, LookupProof,
     NonMembershipProof, UpdateProof,
@@ -21,6 +23,8 @@ use crate::{
 
 use crate::crypto::{compute_fresh_azks_value, get_commitment_nonce, stale_azks_value};
 use crate::VersionFreshness;
+use akd_core::crypto::hash_leaf_with_commitment;
+use akd_core::{AzksValue, MembershipProof};
 use log::{error, info};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -310,6 +314,7 @@ impl<S: Database + 'static, V: VRFKeyStorage> Directory<S, V> {
                     &self.storage,
                     lookup_info.existent_label,
                     current_azks.latest_epoch,
+                    NodeHashingMode::WithLeafEpoch,
                 )
                 .await?,
             marker_vrf_proof: self
@@ -323,6 +328,7 @@ impl<S: Database + 'static, V: VRFKeyStorage> Directory<S, V> {
                     &self.storage,
                     lookup_info.marker_label,
                     current_azks.latest_epoch,
+                    NodeHashingMode::WithLeafEpoch,
                 )
                 .await?,
             freshness_vrf_proof: self
@@ -712,7 +718,12 @@ impl<S: Database + 'static, V: VRFKeyStorage> Directory<S, V> {
         let existence_vrf_proof = existence_vrf.to_bytes().to_vec();
         let existence_label = self.vrf.get_node_label_from_vrf_proof(existence_vrf).await;
         let existence_proof = current_azks
-            .get_membership_proof(&self.storage, label_at_ep, epoch)
+            .get_membership_proof(
+                &self.storage,
+                label_at_ep,
+                epoch,
+                NodeHashingMode::WithLeafEpoch,
+            )
             .await?;
         let mut previous_version_proof = Option::None;
         let mut previous_version_vrf_proof = Option::None;
@@ -723,7 +734,12 @@ impl<S: Database + 'static, V: VRFKeyStorage> Directory<S, V> {
                 .await?;
             previous_version_proof = Option::Some(
                 current_azks
-                    .get_membership_proof(&self.storage, prev_label_at_ep, epoch)
+                    .get_membership_proof(
+                        &self.storage,
+                        prev_label_at_ep,
+                        epoch,
+                        NodeHashingMode::WithLeafEpoch,
+                    )
                     .await?,
             );
             previous_version_vrf_proof = Option::Some(

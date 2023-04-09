@@ -142,7 +142,7 @@ async fn test_empty_tree_root_hash() -> Result<(), AkdError> {
     // Ensuring that the root hash of an empty tree is equal to the following constant
     #[cfg(feature = "blake3")]
     assert_eq!(
-        "f48ded419214732a2c610c1e280543744bab3c17aec33e444997fa2d8f79792a",
+        "2d3adedff11b61f14c886e35afa036736dcd87a74d27b5c1510225d0f592e213",
         hex::encode(hash)
     );
     #[cfg(feature = "sha256")]

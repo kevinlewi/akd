@@ -682,9 +682,10 @@ impl Azks {
         storage: &StorageManager<S>,
         label: NodeLabel,
         _epoch: u64,
+        hash_mode: NodeHashingMode,
     ) -> Result<MembershipProof, AkdError> {
         let (_, proof) = self
-            .get_lcp_node_label_with_membership_proof(storage, label)
+            .get_lcp_node_label_with_membership_proof(storage, label, hash_mode)
             .await?;
         Ok(proof)
     }
@@ -698,7 +699,11 @@ impl Azks {
         label: NodeLabel,
     ) -> Result<NonMembershipProof, AkdError> {
         let (lcp_node_label, longest_prefix_membership_proof) = self
-            .get_lcp_node_label_with_membership_proof(storage, label)
+            .get_lcp_node_label_with_membership_proof(
+                storage,
+                label,
+                NodeHashingMode::WithLeafEpoch,
+            )
             .await?;
         let lcp_node: TreeNode =
             TreeNode::get_from_storage(storage, &NodeKey(lcp_node_label), self.get_latest_epoch())
@@ -1065,12 +1070,13 @@ impl Azks {
         curr_node: &TreeNode,
         dir: Direction,
         latest_epoch: u64,
+        hash_mode: NodeHashingMode,
     ) -> Result<AzksElement, AkdError> {
         // Find the sibling in the "other" direction
         let sibling = curr_node.get_child_node(storage, dir, latest_epoch).await?;
         Ok(AzksElement {
             label: node_to_label(&sibling),
-            value: node_to_azks_value(&sibling, NodeHashingMode::WithLeafEpoch),
+            value: node_to_azks_value(&sibling, hash_mode),
         })
     }
 
@@ -1081,6 +1087,7 @@ impl Azks {
         &self,
         storage: &StorageManager<S>,
         label: NodeLabel,
+        hash_mode: NodeHashingMode,
     ) -> Result<(NodeLabel, MembershipProof), AkdError> {
         let mut sibling_proofs = Vec::new();
         let latest_epoch = self.get_latest_epoch();
@@ -1107,7 +1114,13 @@ impl Azks {
             // Find the sibling node. Note that for ARITY = 2, this does not need to be
             // an array, as it can just be a single node.
             let child_azks_element = self
-                .get_child_azks_element_in_dir(storage, &curr_node, direction.other(), latest_epoch)
+                .get_child_azks_element_in_dir(
+                    storage,
+                    &curr_node,
+                    direction.other(),
+                    latest_epoch,
+                    hash_mode,
+                )
                 .await?;
             sibling_proofs.push(SiblingProof {
                 label: curr_node.label,
@@ -1666,7 +1679,13 @@ mod tests {
 
                 if let Some(left_child) = left_child {
                     let sibling_label = azks
-                        .get_child_azks_element_in_dir(&db, &current_node, Direction::Left, 1)
+                        .get_child_azks_element_in_dir(
+                            &db,
+                            &current_node,
+                            Direction::Left,
+                            1,
+                            NodeHashingMode::WithLeafEpoch,
+                        )
                         .await?
                         .label;
                     assert_eq!(left_child.label, sibling_label);
@@ -1676,7 +1695,13 @@ mod tests {
                 if let Some(right_child) = right_child {
                     println!("right_child.label: {:?}", right_child.label);
                     let sibling_label = azks
-                        .get_child_azks_element_in_dir(&db, &current_node, Direction::Right, 1)
+                        .get_child_azks_element_in_dir(
+                            &db,
+                            &current_node,
+                            Direction::Right,
+                            1,
+                            NodeHashingMode::WithLeafEpoch,
+                        )
                         .await?
                         .label;
                     assert_eq!(right_child.label, sibling_label);
@@ -1704,7 +1729,12 @@ mod tests {
             .await?;
 
         let proof = azks
-            .get_membership_proof(&db, azks_element_set[0].label, 1)
+            .get_membership_proof(
+                &db,
+                azks_element_set[0].label,
+                1,
+                NodeHashingMode::WithLeafEpoch,
+            )
             .await?;
 
         verify_membership(azks.get_root_hash::<_>(&db).await?, &proof)?;
@@ -1735,7 +1765,12 @@ mod tests {
                 .await?;
 
             let proof = azks
-                .get_membership_proof(&db, azks_element_set[0].label, 1)
+                .get_membership_proof(
+                    &db,
+                    azks_element_set[0].label,
+                    1,
+                    NodeHashingMode::WithLeafEpoch,
+                )
                 .await?;
 
             verify_membership(azks.get_root_hash::<_>(&db).await?, &proof)?;
@@ -1759,7 +1794,12 @@ mod tests {
             .await?;
 
         let mut proof = azks
-            .get_membership_proof(&db, azks_element_set[0].label, 1)
+            .get_membership_proof(
+                &db,
+                azks_element_set[0].label,
+                1,
+                NodeHashingMode::WithLeafEpoch,
+            )
             .await?;
         let hash_val = EMPTY_DIGEST;
         proof = MembershipProof {

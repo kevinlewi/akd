@@ -489,8 +489,9 @@ impl TreeNode {
 
 /////// Helpers //////
 
+/// For auditor use
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum NodeHashingMode {
+pub enum NodeHashingMode {
     // Mixes the last epoch into the hashes of any child leaves
     WithLeafEpoch,
     // Does not mix the last epoch into the hashes of child leaves
