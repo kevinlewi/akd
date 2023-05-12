@@ -4,6 +4,7 @@
 // LICENSE-MIT file in the root directory of this source tree or the Apache
 // License, Version 2.0 found in the LICENSE-APACHE file in the root directory
 // of this source tree. You may select, at your option, one of the above-listed licenses.
+// This is a test
 
 //! Contains the tests for the high-level API (directory, auditor, client)
 
