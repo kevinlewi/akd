@@ -1,0 +1,6 @@
+[book]
+authors = ["Kevin Lewi"]
+language = "en"
+multilingual = false
+src = "src"
+title = "AKD"
