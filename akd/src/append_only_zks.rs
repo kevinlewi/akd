@@ -1081,6 +1081,29 @@ impl Azks {
         Ok(load_count)
     }
 
+    async fn check_node_hash_invariant<TC: Configuration, S: Database + 'static>(
+        storage: &StorageManager<S>,
+        node: &TreeNode,
+    ) -> Result<(), AkdError> {
+        // Check if updating the hash of the node will change it
+        let mut mutable_node = node.clone();
+        let current_hash = mutable_node.hash;
+        mutable_node
+            .update_hash::<TC, S>(storage, NodeHashingMode::WithLeafEpoch)
+            .await?;
+        let updated_hash = mutable_node.hash;
+        if current_hash != updated_hash {
+            println!(
+                "[debug] Identified a hash mismatch for node {}: current_hash: {}, updated_hash: {}",
+                node.label,
+                hex::encode(current_hash.0),
+                hex::encode(updated_hash.0),
+            );
+        }
+
+        Ok(())
+    }
+
     #[async_recursion]
     #[allow(clippy::type_complexity)]
     #[allow(clippy::multiple_bound_locations)]
@@ -1096,11 +1119,14 @@ impl Azks {
         let mut unchanged = Vec::<AzksElement>::new();
         let mut leaves = Vec::<AzksElement>::new();
 
+        Self::check_node_hash_invariant::<TC, S>(storage, &node).await?;
+
         if node.get_latest_epoch() <= start_epoch {
             if node.node_type == TreeNodeType::Root {
                 // this is the case where the root is unchanged since the last epoch
                 return Ok((unchanged, leaves));
             }
+
             unchanged.push(AzksElement {
                 label: node.label,
                 value: node_to_azks_value::<TC>(&Some(node), NodeHashingMode::WithLeafEpoch),

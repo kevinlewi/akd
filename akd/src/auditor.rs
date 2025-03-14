@@ -74,7 +74,16 @@ pub async fn verify_consecutive_append_only<TC: Configuration>(
     )
     .await?;
     let computed_start_root_hash: Digest = azks.get_root_hash::<TC, _>(&manager).await?;
+    println!(
+        "[debug] computed_start_root_hash: {:?}",
+        hex::encode(computed_start_root_hash)
+    );
+    println!("[debug] start_hash: {:?}", hex::encode(start_hash),);
     let mut verified = computed_start_root_hash == start_hash;
+    println!(
+        "[debug] computed_start_root_hash == start_hash: {}",
+        computed_start_root_hash == start_hash
+    );
     azks.latest_epoch = end_epoch - 1;
     let updated_inserted = proof
         .inserted
@@ -94,6 +103,15 @@ pub async fn verify_consecutive_append_only<TC: Configuration>(
     .await?;
     let computed_end_root_hash: Digest = azks.get_root_hash::<TC, _>(&manager).await?;
     verified = verified && (computed_end_root_hash == end_hash);
+    println!(
+        "[debug] computed_end_root_hash: {:?}",
+        hex::encode(computed_end_root_hash)
+    );
+    println!("[debug] end_hash: {:?}", hex::encode(end_hash),);
+    println!(
+        "[debug] computed_end_root_hash == end_hash: {}",
+        computed_end_root_hash == end_hash
+    );
     if !verified {
         return Err(AkdError::AzksErr(AzksError::VerifyAppendOnlyProof));
     }
