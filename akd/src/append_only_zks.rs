@@ -1285,6 +1285,87 @@ impl Azks {
         })
     }
 
+    async fn traverse_to_offending_node<TC: Configuration, S: Database + 'static>(
+        &self,
+        storage: &StorageManager<S>,
+    ) -> Result<(), AkdError> {
+        // First, check for the offending node label in unchanged nodes
+        let mut offending_label = [0u8; 32];
+        offending_label.clone_from_slice(
+            &hex::decode("16e4300000000000000000000000000000000000000000000000000000000000")
+                .unwrap(),
+        );
+        let offending_node_label = akd_core::NodeLabel::new(offending_label, 20);
+
+        let latest_epoch = self.get_latest_epoch();
+        let mut curr_node: TreeNode =
+            TreeNode::get_from_storage(storage, &NodeKey(NodeLabel::root()), self.latest_epoch)
+                .await?;
+
+        let mut prefix_ordering = curr_node.label.get_prefix_ordering(offending_node_label);
+        let mut equal = offending_node_label == curr_node.label;
+        let mut prev_node = curr_node.clone();
+        while !equal && prefix_ordering != PrefixOrdering::Invalid {
+            // print node info
+            println!("Node: {:?}", curr_node);
+            Self::check_node_hash_invariant::<TC, S>(storage, &curr_node).await?;
+
+            let direction = Direction::try_from(prefix_ordering).map_err(|_| {
+                AkdError::TreeNode(TreeNodeError::NoDirection(curr_node.label, None))
+            })?;
+            let child = curr_node
+                .get_child_node(storage, direction, latest_epoch)
+                .await?;
+            if child.is_none() {
+                // Special case, if the root node has a direction with no child there
+                break;
+            }
+
+            // Find the sibling node. Note that for ARITY = 2, this does not need to be
+            // an array, as it can just be a single node.
+            let child_azks_element = self
+                .get_child_azks_element_in_dir::<TC, _>(
+                    storage,
+                    &curr_node,
+                    direction.other(),
+                    latest_epoch,
+                )
+                .await?;
+
+            prev_node = curr_node.clone();
+            match curr_node
+                .get_child_node(storage, direction, latest_epoch)
+                .await?
+            {
+                Some(n) => curr_node = n,
+                None => {
+                    return Err(AkdError::TreeNode(TreeNodeError::NoChildAtEpoch(
+                        latest_epoch,
+                        direction,
+                    )));
+                }
+            }
+            prefix_ordering = curr_node.label.get_prefix_ordering(offending_node_label);
+            equal = offending_node_label == curr_node.label;
+        }
+
+        if equal {
+            println!("Found offending node: {:?}", curr_node);
+            Self::check_node_hash_invariant::<TC, S>(storage, &curr_node).await?;
+        } else {
+            println!(
+                "Could not find offending node, closest node: {:?}",
+                prev_node
+            );
+            return Err(AkdError::TreeNode(TreeNodeError::NoStateAtEpoch(
+                offending_node_label,
+                latest_epoch,
+            )));
+        }
+
+        Ok(())
+    }
+
     /// This function returns the node label for the node whose label is the longest common
     /// prefix for the queried label. It also returns a membership proof for said label.
     /// This is meant to be used in both getting membership proofs and getting non-membership proofs.
