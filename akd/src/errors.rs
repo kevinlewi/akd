@@ -338,3 +338,18 @@ impl fmt::Display for ParallelismError {
         }
     }
 }
+
+impl From<AkdError> for vkd::VkdError {
+    fn from(e: AkdError) -> Self {
+        match e {
+            AkdError::TreeNode(e) => vkd::VkdError::Directory(format!("{e:?}")),
+            AkdError::Directory(e) => vkd::VkdError::Directory(format!("{e:?}")),
+            AkdError::AzksErr(e) => vkd::VkdError::Directory(format!("{e:?}")),
+            AkdError::Vrf(e) => vkd::VkdError::Directory(format!("{e:?}")),
+            AkdError::Storage(e) => vkd::VkdError::Storage(format!("{e:?}")),
+            AkdError::AuditErr(e) => vkd::VkdError::Audit(format!("{e:?}")),
+            AkdError::Parallelism(e) => vkd::VkdError::Other(format!("{e:?}")),
+            AkdError::TestErr(s) => vkd::VkdError::Other(s),
+        }
+    }
+}
