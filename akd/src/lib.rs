@@ -568,7 +568,7 @@ mod utils;
 pub use append_only_zks::{Azks, AzksParallelismConfig, AzksParallelismOption};
 pub use client::HistoryVerificationParams;
 pub use directory::Directory;
-pub use helper_structs::EpochHash;
+pub use vkd::VerifiableKeyDirectory;
 
 // ========== Constants and type aliases ========== //
 #[cfg(any(test, feature = "public_tests"))]
