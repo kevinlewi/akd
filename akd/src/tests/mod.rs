@@ -10,6 +10,7 @@
 mod test_core_protocol;
 mod test_errors;
 mod test_preloads;
+mod test_version_epoch_bound;
 
 use std::collections::HashMap;
 

@@ -30,6 +30,17 @@ pub fn lookup_verify<TC: Configuration>(
         )));
     }
 
+    // Versions start at 1 and increase by at most 1 per epoch, so a version can
+    // never exceed the epoch in which it was inserted. Note that proof.epoch is
+    // bound via the leaf's value commitment below.
+    if proof.version > proof.epoch {
+        return Err(VerificationError::LookupProof(alloc::format!(
+            "Proof version {} exceeds its epoch {}",
+            proof.version,
+            proof.epoch
+        )));
+    }
+
     verify_existence_with_val::<TC>(
         vrf_public_key,
         root_hash,

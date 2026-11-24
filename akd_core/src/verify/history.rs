@@ -274,6 +274,17 @@ fn verify_single_update_proof<TC: Configuration>(
     akd_label: &AkdLabel,
     params: HistoryVerificationParams,
 ) -> Result<VerifyResult, VerificationError> {
+    // Versions start at 1 and increase by at most 1 per epoch, so a version can
+    // never exceed the epoch in which it was inserted. Note that proof.epoch is
+    // bound via the fresh leaf's value commitment below, or, when a tombstoned
+    // value is allowed, via the stale leaf for the previous version (if any).
+    if proof.version > proof.epoch {
+        return Err(VerificationError::HistoryProof(format!(
+            "Update proof version {} exceeds its epoch {}",
+            proof.version, proof.epoch
+        )));
+    }
+
     // Verify the VRF and membership proof for the corresponding label for the version being updated to.
     match (params, &proof.value) {
         (HistoryVerificationParams::AllowMissingValues { .. }, bytes)
